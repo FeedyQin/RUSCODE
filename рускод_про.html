@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>РусКод IDE</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Geologica:wght@300;400;500;700;900&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0d0d12;
+  --ink2: #13131c;
+  --ink3: #1c1c2a;
+  --ink4: #252538;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --r: #ff3d5a;
+  --r2: #ff6b7a;
+  --g: #00e5a0;
+  --b: #3d9eff;
+  --y: #ffd166;
+  --p: #c77dff;
+  --text: #e8e8f5;
+  --muted: rgba(232,232,245,0.35);
+  --glow-r: rgba(255,61,90,0.15);
+  --glow-g: rgba(0,229,160,0.12);
+  --ff: 'Fira Code', monospace;
+  --fg: 'Geologica', sans-serif;
+  --fb: 'Bebas Neue', sans-serif;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; }
+
+body {
+  font-family: var(--ff);
+  background: var(--ink);
+  color: var(--text);
+  cursor: default;
+}
+
+/* ─── NOISE + GRID OVERLAY ─── */
+body::before {
+  content:'';
+  position:fixed; inset:0; pointer-events:none; z-index:9000;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+}
+
+/* ─── ANIMATED BG ─── */
+.bg-orbs {
+  position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden;
+}
+.orb {
+  position:absolute; border-radius:50%; filter:blur(80px);
+  animation: orbFloat 12s ease-in-out infinite;
+}
+.orb1 { width:500px;height:500px; background:rgba(255,61,90,0.06); top:-100px;left:-100px; animation-delay:0s; }
+.orb2 { width:400px;height:400px; background:rgba(61,158,255,0.05); bottom:-50px;right:-50px; animation-delay:-4s; }
+.orb3 { width:300px;height:300px; background:rgba(0,229,160,0.04); top:40%;left:40%; animation-delay:-8s; }
+
+@keyframes orbFloat {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33% { transform: translate(30px,-20px) scale(1.05); }
+  66% { transform: translate(-20px,30px) scale(0.95); }
+}
+
+/* ─── LAYOUT ─── */
+#app {
+  position:relative; z-index:1;
+  display:grid;
+  grid-template-rows: 52px 1fr;
+  grid-template-columns: 220px 1fr 300px;
+  height: 100vh;
+}
+
+/* ─── HEADER ─── */
+header {
+  grid-column: 1 / -1;
+  display:flex; align-items:center; gap:0;
+  background: var(--ink2);
+  border-bottom: 1px solid var(--border);
+  position:relative; overflow:hidden;
+}
+header::after {
+  content:'';
+  position:absolute; bottom:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, var(--r) 0%, var(--b) 35%, var(--g) 65%, var(--y) 100%);
+  opacity:0.7;
+}
+
+.logo-zone {
+  display:flex; align-items:center; gap:12px;
+  padding: 0 20px;
+  border-right: 1px solid var(--border);
+  height:100%;
+  min-width:220px;
+}
+
+.logo-icon {
+  width:28px; height:28px; position:relative;
+  display:flex; align-items:center; justify-content:center;
+}
+.logo-icon svg { width:28px; height:28px; }
+
+.logo-text {
+  font-family: var(--fb);
+  font-size: 20px;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, #fff 0%, var(--r) 60%, var(--y) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.logo-sub {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-family: var(--fg);
+  font-weight: 300;
+}
+
+.tabs {
+  display:flex; height:100%; padding-left: 8px; gap:2px; align-items:center;
+}
+.tab {
+  height: 36px;
+  padding: 0 16px;
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; font-family:var(--ff);
+  color:var(--muted);
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
+  cursor:pointer; transition: all 0.15s;
+  position:relative;
+}
+.tab.active {
+  background: var(--ink3);
+  border-color: var(--border);
+  border-bottom-color: var(--ink3);
+  color: var(--text);
+}
+.tab-dot { width:6px;height:6px; border-radius:50%; background:var(--r); opacity:0.8; }
+.tab:hover:not(.active) { color: var(--text); background:rgba(255,255,255,0.04); }
+
+.header-actions {
+  margin-left:auto;
+  display:flex; align-items:center; gap:8px;
+  padding-right:16px;
+}
+
+.h-btn {
+  font-family: var(--fg); font-size:11px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase;
+  border:none; cursor:pointer;
+  padding: 7px 18px;
+  transition: all 0.15s;
+  border-radius:3px;
+}
+.h-btn-run {
+  background: var(--r);
+  color:#fff;
+  box-shadow: 0 0 20px rgba(255,61,90,0.3);
+}
+.h-btn-run:hover {
+  background:#ff5e6e;
+  box-shadow: 0 0 30px rgba(255,61,90,0.5);
+  transform: translateY(-1px);
+}
+.h-btn-run:active { transform: translateY(0); box-shadow:none; }
+
+.h-btn-sec {
+  background:transparent;
+  color:var(--muted);
+  border: 1px solid var(--border);
+}
+.h-btn-sec:hover { color:var(--text); border-color:var(--border2); }
+
+.kbd-hint {
+  font-size:10px; color:var(--muted); letter-spacing:0.5px;
+}
+kbd {
+  background:var(--ink4); border:1px solid var(--border2);
+  padding:2px 5px; border-radius:2px; font-size:9px; color:var(--muted);
+}
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  background: var(--ink2);
+  border-right: 1px solid var(--border);
+  overflow-y:auto; overflow-x:hidden;
+  display:flex; flex-direction:column;
+}
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:var(--border2); }
+
+.s-section {
+  border-bottom: 1px solid var(--border);
+  flex-shrink:0;
+}
+.s-head {
+  padding: 10px 14px 8px;
+  font-size:9px; letter-spacing:2.5px; text-transform:uppercase;
+  color:var(--muted); font-family:var(--fg); font-weight:500;
+  display:flex; align-items:center; gap:6px;
+  cursor:pointer; user-select:none;
+}
+.s-head:hover { color:var(--text); }
+.s-arrow { font-size:8px; transition: transform 0.2s; }
+.s-arrow.open { transform: rotate(90deg); }
+
+.s-body { padding: 0 8px 8px; }
+
+.s-item {
+  display:grid; grid-template-columns:1fr auto;
+  gap:4px; padding:5px 6px; border-radius:4px;
+  cursor:pointer; transition:background 0.1s;
+  align-items:start;
+}
+.s-item:hover { background:var(--ink4); }
+.s-kw { color:var(--r); font-size:11px; line-height:1.4; }
+.s-desc { color:var(--muted); font-size:10px; text-align:right; line-height:1.4; font-family:var(--fg); }
+.s-kw.kw-blue { color:var(--b); }
+.s-kw.kw-green { color:var(--g); }
+.s-kw.kw-yellow { color:var(--y); }
+.s-kw.kw-purple { color:var(--p); }
+
+.example-list { padding: 4px 8px 8px; display:flex; flex-direction:column; gap:3px; }
+.ex-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--b);
+  font-family: var(--fg); font-size:11px; font-weight:500;
+  padding: 6px 10px; border-radius:4px;
+  cursor:pointer; text-align:left; transition: all 0.15s;
+  display:flex; align-items:center; gap:8px;
+}
+.ex-btn::before { content:'▸'; color:var(--muted); font-size:9px; }
+.ex-btn:hover { background:var(--ink4); border-color:var(--b); color:var(--text); }
+.ex-btn:hover::before { color:var(--b); }
+
+/* ─── EDITOR AREA ─── */
+.editor-area {
+  display:flex; flex-direction:column;
+  background: var(--ink);
+  position:relative; overflow:hidden;
+}
+
+.editor-wrapper {
+  flex:1; position:relative; overflow:hidden;
+  display:flex;
+}
+
+/* Line numbers */
+#line-numbers {
+  width:48px; min-width:48px;
+  padding: 18px 0;
+  text-align:right;
+  font-size:13px; line-height:22px;
+  color: rgba(232,232,245,0.2);
+  background: var(--ink);
+  border-right: 1px solid var(--border);
+  user-select:none;
+  overflow:hidden;
+  font-family: var(--ff);
+  padding-right:10px;
+}
+
+.editor-scroll {
+  flex:1; position:relative; overflow:auto;
+}
+.editor-scroll::-webkit-scrollbar { width:6px; height:6px; }
+.editor-scroll::-webkit-scrollbar-track { background:transparent; }
+.editor-scroll::-webkit-scrollbar-thumb { background:var(--ink4); border-radius:3px; }
+.editor-scroll::-webkit-scrollbar-thumb:hover { background:var(--border2); }
+
+/* Highlight layer */
+#highlight-layer {
+  position:absolute; top:0; left:0;
+  padding:18px 16px;
+  font-size:13px; line-height:22px;
+  white-space:pre; font-family:var(--ff);
+  pointer-events:none;
+  min-width:100%;
+}
+
+#editor {
+  position:absolute; top:0; left:0;
+  width:100%; height:100%;
+  min-height:100%;
+  padding:18px 16px;
+  font-size:13px; line-height:22px;
+  font-family:var(--ff);
+  background:transparent;
+  color:transparent;
+  caret-color: var(--r);
+  border:none; outline:none; resize:none;
+  tab-size:4;
+  white-space:pre;
+  overflow:hidden;
+  z-index:2;
+}
+
+/* ─── SYNTAX COLORS ─── */
+.tok-kw    { color: var(--r); font-weight:500; }
+.tok-fn    { color: var(--b); }
+.tok-str   { color: var(--g); }
+.tok-num   { color: var(--y); }
+.tok-bool  { color: var(--p); }
+.tok-op    { color: rgba(232,232,245,0.5); }
+.tok-cmt   { color: rgba(232,232,245,0.25); font-style:italic; }
+.tok-builtin { color: #06b6d4; }
+.tok-plain { color: var(--text); }
+
+/* ─── CURRENT LINE HIGHLIGHT ─── */
+#cursor-line {
+  position:absolute; left:0; right:0; height:22px;
+  background:rgba(255,61,90,0.04);
+  border-left:2px solid rgba(255,61,90,0.3);
+  pointer-events:none; z-index:1;
+  transition: top 0.05s;
+}
+
+/* ─── OUTPUT PANEL ─── */
+.output-panel {
+  height:220px; min-height:120px;
+  background: var(--ink2);
+  border-top: 1px solid var(--border);
+  display:flex; flex-direction:column;
+  flex-shrink:0;
+  resize:vertical; overflow:hidden;
+}
+
+.panel-bar {
+  display:flex; align-items:center; gap:0;
+  height:32px; border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.panel-tab {
+  padding:0 16px; height:100%;
+  display:flex; align-items:center;
+  font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  font-family:var(--fg); font-weight:500;
+  color:var(--muted); cursor:pointer;
+  border-right:1px solid var(--border);
+  transition: color 0.15s;
+}
+.panel-tab.active { color:var(--text); }
+.panel-tab:hover:not(.active) { color:var(--text); }
+
+.run-status {
+  margin-left:auto; padding:0 16px;
+  display:flex; align-items:center; gap:8px;
+  font-size:10px; color:var(--muted);
+}
+.status-dot { width:6px;height:6px; border-radius:50%; background:var(--muted); }
+.status-dot.ok { background:var(--g); box-shadow:0 0 8px var(--g); animation: blink 1.5s ease-in-out 3; }
+.status-dot.err { background:var(--r); box-shadow:0 0 8px var(--r); }
+.status-dot.run { background:var(--y); box-shadow:0 0 8px var(--y); animation: spin-dot 0.8s linear infinite; }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes spin-dot { 0%{box-shadow:0 0 8px var(--y)} 50%{box-shadow:0 0 20px var(--y)} 100%{box-shadow:0 0 8px var(--y)} }
+
+#output {
+  flex:1; overflow-y:auto; overflow-x:auto;
+  padding:10px 16px;
+}
+#output::-webkit-scrollbar { width:4px; height:4px; }
+#output::-webkit-scrollbar-thumb { background:var(--ink4); }
+
+.out-line {
+  display:flex; align-items:baseline; gap:10px;
+  line-height:20px; padding:1px 0;
+}
+.out-n { color:rgba(232,232,245,0.2); font-size:10px; min-width:20px; text-align:right; user-select:none; }
+.out-v { font-size:12px; white-space:pre; }
+.out-v.ok { color:var(--g); }
+.out-v.err { color:var(--r); }
+.out-v.info { color:var(--b); opacity:0.7; }
+.out-v.warn { color:var(--y); }
+
+/* Typing animation for output */
+@keyframes fadeSlideIn {
+  from { opacity:0; transform:translateX(-8px); }
+  to { opacity:1; transform:translateX(0); }
+}
+.out-line { animation: fadeSlideIn 0.15s ease forwards; }
+
+/* ─── RIGHT PANEL ─── */
+.right-panel {
+  background: var(--ink2);
+  border-left:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+
+.r-head {
+  padding:12px 16px 8px;
+  font-size:9px; letter-spacing:2.5px; text-transform:uppercase;
+  color:var(--muted); font-family:var(--fg); font-weight:500;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+
+#ast-view {
+  flex:1; overflow-y:auto; overflow-x:auto;
+  padding:10px; font-size:11px; line-height:1.7;
+  color:var(--muted);
+}
+#ast-view::-webkit-scrollbar { width:3px; }
+#ast-view::-webkit-scrollbar-thumb { background:var(--border2); }
+
+.ast-node {
+  padding:2px 6px; border-radius:3px; cursor:default;
+}
+.ast-node:hover { background:var(--ink4); }
+.ast-type { color: var(--b); font-size:10px; }
+.ast-val { color: var(--g); }
+.ast-tree { padding-left:16px; border-left: 1px solid var(--border); margin-left:6px; }
+
+/* ─── MINIMAP ─── */
+.minimap {
+  position:absolute; right:0; top:0; bottom:0;
+  width:60px; background:rgba(13,13,18,0.8);
+  border-left:1px solid var(--border);
+  overflow:hidden; pointer-events:none;
+  opacity:0.6;
+}
+#minimap-canvas { display:block; }
+
+/* ─── AUTOCOMPLETE ─── */
+#autocomplete {
+  position:fixed; z-index:5000;
+  background:var(--ink3); border:1px solid var(--border2);
+  border-radius:6px; overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  display:none; min-width:180px;
+}
+.ac-item {
+  padding:7px 14px; font-size:12px; cursor:pointer;
+  display:flex; align-items:center; gap:10px;
+  transition:background 0.1s;
+}
+.ac-item:hover, .ac-item.selected { background:var(--ink4); }
+.ac-kind { font-size:9px; color:var(--muted); min-width:36px; }
+.ac-kw { color:var(--r); }
+.ac-kw.fn { color:var(--b); }
+.ac-kw.builtin { color:#06b6d4; }
+
+/* ─── SPLASH ─── */
+#splash {
+  position:fixed; inset:0; z-index:10000;
+  background:var(--ink);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  animation: splashOut 0.5s ease 1.8s forwards;
+}
+@keyframes splashOut {
+  to { opacity:0; pointer-events:none; }
+}
+.splash-logo {
+  font-family:var(--fb);
+  font-size:clamp(60px,12vw,120px);
+  letter-spacing:10px;
+  background:linear-gradient(135deg,#fff 0%,var(--r) 50%,var(--y) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation: splashIn 0.8s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  opacity:0;
+}
+@keyframes splashIn {
+  from { opacity:0; transform:scale(0.8) translateY(20px); }
+  to { opacity:1; transform:scale(1) translateY(0); }
+}
+.splash-sub {
+  font-family:var(--fg); font-size:13px; letter-spacing:4px;
+  color:var(--muted); text-transform:uppercase; margin-top:12px;
+  animation: splashIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.3s forwards;
+  opacity:0;
+}
+.splash-bar {
+  width:200px; height:2px; background:var(--ink4); margin-top:32px; border-radius:1px;
+  overflow:hidden;
+  animation: splashIn 0 0.6s forwards; opacity:0;
+}
+.splash-fill {
+  height:100%; width:0;
+  background:linear-gradient(90deg,var(--r),var(--y));
+  animation: loadBar 1s ease 0.6s forwards;
+}
+@keyframes loadBar { to { width:100%; } }
+
+/* ─── RESIZE HANDLE ─── */
+.resize-h {
+  height:4px; cursor:row-resize;
+  background:var(--border);
+  flex-shrink:0;
+  transition:background 0.2s;
+}
+.resize-h:hover { background:var(--r); }
+
+/* ─── SCROLLBAR TRACK for sidebar ─── */
+.sidebar::-webkit-scrollbar-track { background:transparent; }
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">РУСКОД</div>
+  <div class="splash-sub">Язык программирования на русском</div>
+  <div class="splash-bar"><div class="splash-fill"></div></div>
+</div>
+
+<!-- BG -->
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-zone">
+      <div class="logo-icon">
+        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="14,2 26,22 2,22" fill="none" stroke="url(#lg)" stroke-width="2"/>
+          <circle cx="14" cy="16" r="4" fill="url(#lg2)" opacity="0.9"/>
+          <defs>
+            <linearGradient id="lg" x1="2" y1="22" x2="26" y2="2" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ff3d5a"/><stop offset="1" stop-color="#ffd166"/>
+            </linearGradient>
+            <linearGradient id="lg2" x1="10" y1="12" x2="18" y2="20" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#3d9eff"/><stop offset="1" stop-color="#00e5a0"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">РУСКОД</div>
+        <div class="logo-sub">IDE v2.0</div>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active"><div class="tab-dot"></div>main.рк</div>
+    </div>
+    <div class="header-actions">
+      <span class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> запуск</span>
+      <button class="h-btn h-btn-sec" onclick="clearOutput()">Очистить</button>
+      <button class="h-btn h-btn-run" onclick="runCode()" id="run-btn">▶ Запустить</button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="s-section">
+      <div class="s-head" onclick="toggleSection(this)">
+        <span class="s-arrow open">▶</span> Переменные
+      </div>
+      <div class="s-body">
+        <div class="s-item"><span class="s-kw">перем х = 5</span><span class="s-desc">число</span></div>
+        <div class="s-item"><span class="s-kw">перем с = "текст"</span><span class="s-desc">строка</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">истина / ложь</span><span class="s-desc">булево</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">ничто</span><span class="s-desc">null</span></div>
+        <div class="s-item"><span class="s-kw kw-yellow">перем а = [1,2,3]</span><span class="s-desc">массив</span></div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-head" onclick="toggleSection(this)">
+        <span class="s-arrow open">▶</span> Управление
+      </div>
+      <div class="s-body">
+        <div class="s-item"><span class="s-kw">если (у) { }</span><span class="s-desc">если</span></div>
+        <div class="s-item"><span class="s-kw">иначе если</span><span class="s-desc">иначе если</span></div>
+        <div class="s-item"><span class="s-kw">иначе { }</span><span class="s-desc">иначе</span></div>
+        <div class="s-item"><span class="s-kw">и / или / не</span><span class="s-desc">логика</span></div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-head" onclick="toggleSection(this)">
+        <span class="s-arrow open">▶</span> Циклы
+      </div>
+      <div class="s-body">
+        <div class="s-item"><span class="s-kw kw-blue">от (н;у;ш) { }</span><span class="s-desc">for</span></div>
+        <div class="s-item"><span class="s-kw kw-blue">пока (у) { }</span><span class="s-desc">while</span></div>
+        <div class="s-item"><span class="s-kw kw-blue">каждый (х из а)</span><span class="s-desc">foreach</span></div>
+        <div class="s-item"><span class="s-kw">стоп / дальше</span><span class="s-desc">break/cont</span></div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-head" onclick="toggleSection(this)">
+        <span class="s-arrow open">▶</span> Функции
+      </div>
+      <div class="s-body">
+        <div class="s-item"><span class="s-kw kw-green">функция ф(а,б)</span><span class="s-desc">объявить</span></div>
+        <div class="s-item"><span class="s-kw kw-green">вернуть знач</span><span class="s-desc">return</span></div>
+        <div class="s-item"><span class="s-kw">вывести(х)</span><span class="s-desc">print</span></div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-head" onclick="toggleSection(this)">
+        <span class="s-arrow open">▶</span> Встроенные
+      </div>
+      <div class="s-body">
+        <div class="s-item"><span class="s-kw kw-purple">длина(х)</span><span class="s-desc">длина</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">тип(х)</span><span class="s-desc">тип</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">число(х)</span><span class="s-desc">→число</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">строка(х)</span><span class="s-desc">→строка</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">случайное(а,б)</span><span class="s-desc">random</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">округлить(х)</span><span class="s-desc">round</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">абс(х)</span><span class="s-desc">abs</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">максимум(а,б)</span><span class="s-desc">max</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">минимум(а,б)</span><span class="s-desc">min</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">добавить(а,х)</span><span class="s-desc">push</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">удалить(а,i)</span><span class="s-desc">splice</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">содержит(а,х)</span><span class="s-desc">includes</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">срез(а,н,к)</span><span class="s-desc">slice</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">верхний(с)</span><span class="s-desc">toUpper</span></div>
+        <div class="s-item"><span class="s-kw kw-purple">нижний(с)</span><span class="s-desc">toLower</span></div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-head" onclick="toggleSection(this)">
+        <span class="s-arrow open">▶</span> Примеры
+      </div>
+      <div class="example-list">
+        <button class="ex-btn" onclick="loadEx('hello')">Привет мир</button>
+        <button class="ex-btn" onclick="loadEx('fizzbuzz')">ФизБаз</button>
+        <button class="ex-btn" onclick="loadEx('factorial')">Факториал</button>
+        <button class="ex-btn" onclick="loadEx('fib')">Фибоначчи</button>
+        <button class="ex-btn" onclick="loadEx('sort')">Сортировка</button>
+        <button class="ex-btn" onclick="loadEx('prime')">Простые числа</button>
+        <button class="ex-btn" onclick="loadEx('caesar')">Шифр Цезаря</button>
+        <button class="ex-btn" onclick="loadEx('matrix')">Таблица умножения</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- EDITOR AREA -->
+  <div class="editor-area">
+    <div class="editor-wrapper">
+      <div id="line-numbers"></div>
+      <div class="editor-scroll" id="editor-scroll">
+        <div id="cursor-line"></div>
+        <div id="highlight-layer" aria-hidden="true"></div>
+        <textarea id="editor" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+      </div>
+      <canvas id="minimap-canvas" class="minimap" width="60"></canvas>
+    </div>
+    <div class="resize-h" id="resize-handle"></div>
+    <div class="output-panel" id="output-panel">
+      <div class="panel-bar">
+        <div class="panel-tab active">Вывод</div>
+        <div class="run-status">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-txt">Готов</span>
+        </div>
+      </div>
+      <div id="output"><div class="out-line"><div class="out-n">—</div><div class="out-v info">// Нажмите ▶ Запустить или Ctrl+Enter для выполнения</div></div></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="r-head">Переменные · <span id="var-count" style="color:var(--g)">0</span></div>
+    <div id="ast-view"><div style="color:var(--muted);padding:8px;font-size:11px;font-family:var(--fg)">Запустите программу чтобы увидеть переменные</div></div>
+  </div>
+
+</div>
+
+<!-- AUTOCOMPLETE -->
+<div id="autocomplete"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  РУСКОД 2.0 — ПОЛНЫЙ ДВИЖОК
+// ══════════════════════════════════════════════
+
+const KEYWORDS = ['перем','функция','вернуть','если','иначе','пока','от','каждый','из','стоп','дальше','вывести','истина','ложь','ничто','и','или','не'];
+const BUILTINS = ['длина','тип','число','строка','случайное','округлить','максимум','минимум','абс','добавить','удалить','содержит','срез','верхний','нижний'];
+
+const EXAMPLES = {
+hello:`// Привет мир!
+перем имя = "Мир"
+перем версия = 2.0
+вывести("╔══════════════════╗")
+вывести("║  ПРИВЕТ, " + имя + "!   ║")
+вывести("╚══════════════════╝")
+вывести("РусКод v" + версия + " — работает!")`,
+
+fizzbuzz:`// ФизБаз — классика
+от (перем и = 1; и <= 30; и++) {
+    если (и % 15 == 0) {
+        вывести(и + " → ФизБаз 🎯")
+    } иначе если (и % 3 == 0) {
+        вывести(и + " → Физ")
+    } иначе если (и % 5 == 0) {
+        вывести(и + " → Баз")
+    } иначе {
+        вывести(и)
+    }
+}`,
+
+factorial:`// Факториал через рекурсию
+функция факториал(н) {
+    если (н <= 1) { вернуть 1 }
+    вернуть н * факториал(н - 1)
+}
+
+вывести("Факториалы:")
+от (перем и = 0; и <= 12; и++) {
+    вывести(и + "! = " + факториал(и))
+}`,
+
+fib:`// Числа Фибоначчи
+функция фиб(н) {
+    если (н <= 1) { вернуть н }
+    вернуть фиб(н-1) + фиб(н-2)
+}
+
+перем ряд = []
+от (перем и = 0; и < 14; и++) {
+    добавить(ряд, фиб(и))
+}
+
+вывести("Последовательность Фибоначчи:")
+вывести(ряд)
+
+перем сумма = 0
+каждый (перем х из ряд) {
+    сумма = сумма + х
+}
+вывести("Сумма: " + сумма)`,
+
+sort:`// Сортировка пузырьком
+функция пузырёк(а) {
+    перем н = длина(а)
+    от (перем и = 0; и < н-1; и++) {
+        от (перем й = 0; й < н-и-1; й++) {
+            если (а[й] > а[й+1]) {
+                перем т = а[й]
+                а[й] = а[й+1]
+                а[й+1] = т
+            }
+        }
+    }
+    вернуть а
+}
+
+перем данные = [64, 34, 25, 12, 22, 11, 90, 3, 47]
+вывести("До:     " + данные)
+пузырёк(данные)
+вывести("После:  " + данные)
+вывести("Минимум: " + данные[0])
+вывести("Максимум: " + данные[длина(данные)-1])`,
+
+prime:`// Простые числа
+функция простое(н) {
+    если (н < 2) { вернуть ложь }
+    от (перем и = 2; и * и <= н; и++) {
+        если (н % и == 0) { вернуть ложь }
+    }
+    вернуть истина
+}
+
+перем простые = []
+от (перем и = 2; и <= 100; и++) {
+    если (простое(и)) { добавить(простые, и) }
+}
+вывести("Простые числа до 100:")
+вывести(простые)
+вывести("Количество: " + длина(простые))`,
+
+caesar:`// Шифр Цезаря (цифры)
+функция шифр(текст, сдвиг) {
+    перем рез = ""
+    от (перем и = 0; и < длина(текст); и++) {
+        перем код = текст[и]
+        рез = рез + код
+    }
+    вернуть рез
+}
+
+перем слова = ["РУСКОД", "ПРИВЕТ", "ПРОГРАММА"]
+каждый (перем сл из слова) {
+    вывести("Слово: " + сл + " → длина: " + длина(сл))
+}
+
+// Числовое шифрование
+перем сообщение = [82, 85, 83, 75, 79, 68]
+перем ключ = 13
+перем зашифр = []
+каждый (перем к из сообщение) {
+    добавить(зашифр, к + ключ)
+}
+вывести("Исходные коды: " + сообщение)
+вывести("Зашифровано:   " + зашифр)`,
+
+matrix:`// Таблица умножения
+вывести("   Таблица Пифагора")
+вывести("  ╔" + "═══╦".repeat(9) + "═══╗")
+
+от (перем и = 1; и <= 9; и++) {
+    перем строка = "  ║"
+    от (перем й = 1; й <= 9; й++) {
+        перем пр = и * й
+        если (пр < 10) {
+            строка = строка + " " + пр + " ║"
+        } иначе {
+            строка = строка + " " + пр + "║"
+        }
+    }
+    вывести(строка)
+    если (и < 9) {
+        вывести("  ╠" + "═══╬".repeat(9) + "═══╣")
+    }
+}
+вывести("  ╚" + "═══╩".repeat(9) + "═══╝")`
+};
+
+// ════════════ TOKENIZER ════════════
+function tokenize(code) {
+  const KW_MAP = {
+    'перем':'VAR','функция':'FUNC','вернуть':'RETURN',
+    'если':'IF','иначе':'ELSE','пока':'WHILE',
+    'от':'FOR','каждый':'FOREACH','из':'IN',
+    'стоп':'BREAK','дальше':'CONTINUE',
+    'вывести':'PRINT',
+    'истина':'TRUE','ложь':'FALSE','ничто':'NULL',
+    'и':'AND','или':'OR','не':'NOT'
+  };
+  const BUILTIN_SET = new Set(BUILTINS);
+  const tokens=[]; let i=0;
+  while(i<code.length){
+    if(/\s/.test(code[i])){i++;continue;}
+    if(code[i]==='/'&&code[i+1]==='/'){while(i<code.length&&code[i]!=='\n')i++;continue;}
+    if(/[0-9]/.test(code[i])){
+      let n='';
+      while(i<code.length&&/[0-9.]/.test(code[i]))n+=code[i++];
+      tokens.push({type:'NUM',val:parseFloat(n)});continue;
+    }
+    if(code[i]==='"'||code[i]==="'"){
+      const q=code[i++];let s='';
+      while(i<code.length&&code[i]!==q){
+        if(code[i]==='\\'&&i+1<code.length){i++;s+=code[i++];}
+        else s+=code[i++];
+      }
+      i++;tokens.push({type:'STR',val:s});continue;
+    }
+    if(/[a-zA-Zа-яёА-ЯЁ_]/.test(code[i])){
+      let id='';
+      while(i<code.length&&/[a-zA-Zа-яёА-ЯЁ_0-9]/.test(code[i]))id+=code[i++];
+      const kw=KW_MAP[id];
+      if(kw)tokens.push({type:kw,val:id});
+      else if(BUILTIN_SET.has(id))tokens.push({type:'BUILTIN',val:id});
+      else tokens.push({type:'IDENT',val:id});
+      continue;
+    }
+    const two=code.slice(i,i+2);
+    if(['==','!=','<=','>=','++','--','+=','-=','*=','/=','&&','||'].includes(two)){
+      tokens.push({type:'OP',val:two});i+=2;continue;
+    }
+    const one=code[i];
+    if('+-*/%=<>!&|'.includes(one)){tokens.push({type:'OP',val:one});i++;continue;}
+    if('(){}[];,.'.includes(one)){tokens.push({type:one,val:one});i++;continue;}
+    i++;
+  }
+  return tokens;
+}
+
+// ════════════ PARSER ════════════
+class Parser{
+  constructor(t){this.t=t;this.p=0;}
+  pk(){return this.t[this.p];}
+  eat(tp){
+    const t=this.t[this.p];
+    if(!t)throw new Error(`Ожидался "${tp}", но код закончился`);
+    if(tp&&t.type!==tp)throw new Error(`Строка: ожидался "${tp}", получен "${t.val}"`);
+    this.p++;return t;
+  }
+  ch(tp,v){const t=this.pk();if(!t)return false;if(tp&&t.type!==tp)return false;if(v!==undefined&&t.val!==v)return false;return true;}
+  prog(){const b=[];while(this.pk())b.push(this.stmt());return{type:'Program',body:b};}
+  block(){this.eat('{');const b=[];while(!this.ch('}'))b.push(this.stmt());this.eat('}');return{type:'Block',body:b};}
+  stmt(){
+    const t=this.pk();if(!t)throw new Error('Неожиданный конец');
+    if(t.type==='VAR')return this.sVar();
+    if(t.type==='FUNC')return this.sFunc();
+    if(t.type==='RETURN')return this.sRet();
+    if(t.type==='IF')return this.sIf();
+    if(t.type==='WHILE')return this.sWhile();
+    if(t.type==='FOR')return this.sFor();
+    if(t.type==='FOREACH')return this.sForeach();
+    if(t.type==='BREAK'){this.p++;this.semi();return{type:'Break'};}
+    if(t.type==='CONTINUE'){this.p++;this.semi();return{type:'Continue'};}
+    if(t.type==='PRINT')return this.sPrint();
+    const e=this.expr();this.semi();return{type:'ExprStmt',expr:e};
+  }
+  semi(){if(this.ch(';'))this.eat(';');}
+  sVar(){this.eat('VAR');const n=this.eat('IDENT').val;let i=null;if(this.ch('OP','=')){{this.eat('OP');i=this.expr();}}this.semi();return{type:'VarDecl',name:n,init:i};}
+  sFunc(){
+    this.eat('FUNC');const n=this.eat('IDENT').val;this.eat('(');
+    const ps=[];while(!this.ch(')')){ps.push(this.eat('IDENT').val);if(this.ch(','))this.eat(',');}
+    this.eat(')');const b=this.block();return{type:'FuncDecl',name:n,params:ps,body:b};
+  }
+  sRet(){this.eat('RETURN');let v=null;if(this.pk()&&!this.ch(';')&&!this.ch('}'))v=this.expr();this.semi();return{type:'Return',val:v};}
+  sIf(){
+    this.eat('IF');this.eat('(');const c=this.expr();this.eat(')');const th=this.block();let alt=null;
+    if(this.ch('ELSE')){this.eat('ELSE');if(this.ch('IF'))alt=this.sIf();else alt=this.block();}
+    return{type:'If',cond:c,then:th,alt};
+  }
+  sWhile(){this.eat('WHILE');this.eat('(');const c=this.expr();this.eat(')');const b=this.block();return{type:'While',cond:c,body:b};}
+  sFor(){
+    this.eat('FOR');this.eat('(');
+    let ini=null;
+    if(!this.ch(';')){if(this.ch('VAR'))ini=this.sVar();else{ini={type:'ExprStmt',expr:this.expr()};this.semi();}}else this.semi();
+    let cnd=null;if(!this.ch(';'))cnd=this.expr();this.semi();
+    let upd=null;if(!this.ch(')'))upd=this.expr();
+    this.eat(')');const b=this.block();return{type:'For',init:ini,cond:cnd,update:upd,body:b};
+  }
+  sForeach(){
+    this.eat('FOREACH');this.eat('(');this.eat('VAR');const vn=this.eat('IDENT').val;
+    this.eat('IN');const it=this.expr();this.eat(')');const b=this.block();
+    return{type:'Foreach',varName:vn,iter:it,body:b};
+  }
+  sPrint(){
+    this.eat('PRINT');this.eat('(');const a=[];
+    while(!this.ch(')')){a.push(this.expr());if(this.ch(','))this.eat(',');}
+    this.eat(')');this.semi();return{type:'Print',args:a};
+  }
+  expr(){return this.assign();}
+  assign(){
+    let l=this.orExpr();
+    if(this.ch('OP','=')){this.eat('OP');const r=this.assign();return{type:'Assign',left:l,right:r};}
+    if(this.ch('OP','+='))||this.ch('OP','-=')||this.ch('OP','*=')||this.ch('OP','/=')){
+      const op=this.eat('OP').val;const r=this.assign();
+      return{type:'Assign',left:l,right:{type:'BinOp',op:op[0],left:l,right:r}};
+    }
+    return l;
+  }
+  orExpr(){let l=this.andExpr();while(this.ch('OR')||this.ch('OP','||')){this.p++;l={type:'BinOp',op:'||',left:l,right:this.andExpr()};}return l;}
+  andExpr(){let l=this.eqExpr();while(this.ch('AND')||this.ch('OP','&&')){this.p++;l={type:'BinOp',op:'&&',left:l,right:this.eqExpr()};}return l;}
+  eqExpr(){let l=this.relExpr();while(this.ch('OP','==')||this.ch('OP','!=')){const op=this.eat('OP').val;l={type:'BinOp',op,left:l,right:this.relExpr()};}return l;}
+  relExpr(){let l=this.addExpr();while(this.ch('OP','<')||this.ch('OP','>')||this.ch('OP','<=')||this.ch('OP','>=')){const op=this.eat('OP').val;l={type:'BinOp',op,left:l,right:this.addExpr()};}return l;}
+  addExpr(){let l=this.mulExpr();while(this.ch('OP','+')||this.ch('OP','-')){const op=this.eat('OP').val;l={type:'BinOp',op,left:l,right:this.mulExpr()};}return l;}
+  mulExpr(){let l=this.unary();while(this.ch('OP','*')||this.ch('OP','/')||this.ch('OP','%')){const op=this.eat('OP').val;l={type:'BinOp',op,left:l,right:this.unary()};}return l;}
+  unary(){
+    if(this.ch('OP','-')){this.eat('OP');return{type:'Unary',op:'-',expr:this.unary()};}
+    if(this.ch('OP','!')||this.ch('NOT')){this.p++;return{type:'Unary',op:'!',expr:this.unary()};}
+    return this.postfix();
+  }
+  postfix(){
+    let e=this.primary();
+    while(true){
+      if(this.ch('(')){
+        this.eat('(');const a=[];
+        while(!this.ch(')')){a.push(this.expr());if(this.ch(','))this.eat(',');}
+        this.eat(')');e={type:'Call',callee:e,args:a};
+      }else if(this.ch('[')){
+        this.eat('[');const i=this.expr();this.eat(']');e={type:'Index',obj:e,idx:i};
+      }else if(this.ch('OP','++')){this.eat('OP');e={type:'PostfixOp',op:'++',expr:e};}
+      else if(this.ch('OP','--')){this.eat('OP');e={type:'PostfixOp',op:'--',expr:e};}
+      else break;
+    }
+    return e;
+  }
+  primary(){
+    const t=this.pk();if(!t)throw new Error('Неожиданный конец выражения');
+    if(t.type==='NUM'){this.p++;return{type:'Num',val:t.val};}
+    if(t.type==='STR'){this.p++;return{type:'Str',val:t.val};}
+    if(t.type==='TRUE'){this.p++;return{type:'Bool',val:true};}
+    if(t.type==='FALSE'){this.p++;return{type:'Bool',val:false};}
+    if(t.type==='NULL'){this.p++;return{type:'Null'};}
+    if(t.type==='IDENT'||t.type==='BUILTIN'){this.p++;return{type:'Ident',name:t.val};}
+    if(t.type==='PRINT'){this.p++;return{type:'Ident',name:'вывести'};}
+    if(t.type==='('){this.eat('(');const e=this.expr();this.eat(')');return{type:'Group',expr:e};}
+    if(t.type==='['){
+      this.eat('[');const els=[];
+      while(!this.ch(']')){els.push(this.expr());if(this.ch(','))this.eat(',');}
+      this.eat(']');return{type:'Array',elements:els};
+    }
+    throw new Error(`Неожиданный токен: "${t.val}"`);
+  }
+}
+
+// ════════════ INTERPRETER ════════════
+class Break{constructor(){this.t='break';}}
+class Continue{constructor(){this.t='continue';}}
+class Return{constructor(v){this.v=v;this.t='return';}}
+
+class Interpreter{
+  constructor(out){
+    this.out=out; this.cs=0;
+    this.globals=new Map();
+    this.vars=new Map(); // for variable inspector
+    this._builtins();
+  }
+  _str(v){
+    if(v===null||v===undefined)return'ничто';
+    if(v===true)return'истина';
+    if(v===false)return'ложь';
+    if(Array.isArray(v))return'['+v.map(x=>this._str(x)).join(', ')+']';
+    if(typeof v==='function')return'<функция>';
+    return String(v);
+  }
+  _builtins(){
+    const G=this.globals;
+    G.set('длина',a=>{const v=a[0];return(typeof v==='string'||Array.isArray(v))?v.length:0;});
+    G.set('тип',a=>{const v=a[0];if(v===null)return'ничто';if(Array.isArray(v))return'массив';if(typeof v==='number')return'число';if(typeof v==='string')return'строка';if(typeof v==='boolean')return v?'истина':'ложь';return'неизвестно';});
+    G.set('число',a=>parseFloat(a[0]));
+    G.set('строка',a=>this._str(a[0]));
+    G.set('случайное',a=>{const[lo=0,hi=100]=a;return Math.floor(Math.random()*(hi-lo+1))+lo;});
+    G.set('округлить',a=>Math.round(a[0]));
+    G.set('максимум',a=>Math.max(a[0],a[1]));
+    G.set('минимум',a=>Math.min(a[0],a[1]));
+    G.set('абс',a=>Math.abs(a[0]));
+    G.set('добавить',a=>{if(Array.isArray(a[0]))a[0].push(a[1]);return a[0];});
+    G.set('удалить',a=>{if(Array.isArray(a[0]))a[0].splice(a[1],1);return a[0];});
+    G.set('содержит',a=>{if(Array.isArray(a[0]))return a[0].includes(a[1]);if(typeof a[0]==='string')return a[0].includes(a[1]);return false;});
+    G.set('срез',a=>Array.isArray(a[0])?a[0].slice(a[1],a[2]):typeof a[0]==='string'?a[0].slice(a[1],a[2]):[]);
+    G.set('верхний',a=>typeof a[0]==='string'?a[0].toUpperCase():a[0]);
+    G.set('нижний',a=>typeof a[0]==='string'?a[0].toLowerCase():a[0]);
+    G.set('вывести',a=>{this.out(a.map(x=>this._str(x)).join(' '));});
+  }
+  run(ast){
+    const env=new Map(this.globals);
+    this.execBlock(ast.body,env);
+    // Collect vars for inspector
+    this.vars=new Map();
+    for(const[k,v] of env){
+      if(typeof v!=='function'&&!this.globals.has(k))this.vars.set(k,v);
+    }
+  }
+  execBlock(stmts,env){
+    for(const s of stmts){
+      const r=this.execStmt(s,env);
+      if(r instanceof Break||r instanceof Continue||r instanceof Return)return r;
+    }
+  }
+  execStmt(node,env){
+    if(node.type==='VarDecl'){
+      const v=node.init?this.eval(node.init,env):null;
+      env.set(node.name,v);
+    }else if(node.type==='FuncDecl'){
+      const fn=(args)=>{
+        if(++this.cs>1000)throw new Error('Переполнение стека (слишком глубокая рекурсия)');
+        const loc=new Map(env);
+        node.params.forEach((p,i)=>loc.set(p,args[i]??null));
+        const r=this.execBlock(node.body.body,loc);
+        this.cs--;
+        if(r instanceof Return)return r.v;
+        return null;
+      };
+      fn._name=node.name;
+      env.set(node.name,fn);
+    }else if(node.type==='Return'){
+      return new Return(node.val?this.eval(node.val,env):null);
+    }else if(node.type==='Break')return new Break();
+    else if(node.type==='Continue')return new Continue();
+    else if(node.type==='Print'){
+      this.out(node.args.map(a=>this._str(this.eval(a,env))).join(' '));
+    }else if(node.type==='If'){
+      if(this.eval(node.cond,env)){
+        return this.execBlock(node.then.body,new Map(env));
+      }else if(node.alt){
+        if(node.alt.type==='Block')return this.execBlock(node.alt.body,new Map(env));
+        else return this.execStmt(node.alt,env);
+      }
+    }else if(node.type==='While'){
+      let it=0;
+      while(this.eval(node.cond,env)){
+        if(++it>200000)throw new Error('Превышен лимит итераций цикла');
+        const r=this.execBlock(node.body.body,new Map(env));
+        if(r instanceof Break)break;
+        if(r instanceof Continue)continue;
+        if(r instanceof Return)return r;
+      }
+    }else if(node.type==='For'){
+      const le=new Map(env);
+      if(node.init)this.execStmt(node.init,le);
+      let it=0;
+      while(!node.cond||this.eval(node.cond,le)){
+        if(++it>200000)throw new Error('Превышен лимит итераций цикла');
+        const r=this.execBlock(node.body.body,new Map(le));
+        if(r instanceof Break)break;
+        if(r instanceof Continue){if(node.update)this.eval(node.update,le);continue;}
+        if(r instanceof Return)return r;
+        if(node.update)this.eval(node.update,le);
+      }
+    }else if(node.type==='Foreach'){
+      const arr=this.eval(node.iter,env);
+      if(!Array.isArray(arr))throw new Error('каждый: ожидался массив');
+      for(const item of arr){
+        const le=new Map(env);le.set(node.varName,item);
+        const r=this.execBlock(node.body.body,le);
+        if(r instanceof Break)break;
+        if(r instanceof Continue)continue;
+        if(r instanceof Return)return r;
+      }
+    }else if(node.type==='ExprStmt'){
+      this.eval(node.expr,env);
+    }else if(node.type==='Block'){
+      return this.execBlock(node.body,new Map(env));
+    }
+  }
+  eval(node,env){
+    if(node.type==='Num')return node.val;
+    if(node.type==='Str')return node.val;
+    if(node.type==='Bool')return node.val;
+    if(node.type==='Null')return null;
+    if(node.type==='Array')return node.elements.map(e=>this.eval(e,env));
+    if(node.type==='Group')return this.eval(node.expr,env);
+    if(node.type==='Ident'){
+      if(!env.has(node.name))throw new Error(`Переменная не определена: "${node.name}"`);
+      return env.get(node.name);
+    }
+    if(node.type==='Assign'){
+      const v=this.eval(node.right,env);
+      this._set(node.left,v,env);
+      return v;
+    }
+    if(node.type==='BinOp'){
+      const l=this.eval(node.left,env),r=this.eval(node.right,env);
+      switch(node.op){
+        case'+':(typeof l==='string'||typeof r==='string')?0:0;
+          return(typeof l==='string'||typeof r==='string')?this._str(l)+this._str(r):l+r;
+        case'-':return l-r;case'*':return l*r;
+        case'/':if(r===0)throw new Error('Деление на ноль!');return l/r;
+        case'%':return l%r;
+        case'==':return l===r;case'!=':return l!==r;
+        case'<':return l<r;case'>':return l>r;
+        case'<=':return l<=r;case'>=':return l>=r;
+        case'&&':return l&&r;case'||':return l||r;
+      }
+    }
+    if(node.type==='Unary'){
+      const v=this.eval(node.expr,env);
+      if(node.op==='-')return -v;
+      if(node.op==='!')return!v;
+    }
+    if(node.type==='PostfixOp'){
+      const old=this.eval(node.expr,env);
+      this._set(node.expr,node.op==='++'?old+1:old-1,env);
+      return old;
+    }
+    if(node.type==='Index'){
+      const obj=this.eval(node.obj,env),idx=this.eval(node.idx,env);
+      if(Array.isArray(obj)){
+        if(idx<0||idx>=obj.length)throw new Error(`Индекс ${idx} за пределами массива (размер: ${obj.length})`);
+        return obj[idx];
+      }
+      if(typeof obj==='string')return obj[idx]??null;
+      throw new Error('Индексация не поддерживается');
+    }
+    if(node.type==='Call'){
+      const fn=this.eval(node.callee,env);
+      if(typeof fn!=='function')throw new Error(`"${node.callee.name||'?'}" не является функцией`);
+      return fn(node.args.map(a=>this.eval(a,env)),env);
+    }
+    throw new Error('Неизвестный узел AST: '+node.type);
+  }
+  _set(left,val,env){
+    if(left.type==='Ident'){
+      if(!env.has(left.name))throw new Error(`Переменная не определена: "${left.name}"`);
+      env.set(left.name,val);
+    }else if(left.type==='Index'){
+      const obj=this.eval(left.obj,env),idx=this.eval(left.idx,env);
+      if(!Array.isArray(obj))throw new Error('Присвоение по индексу только для массивов');
+      obj[idx]=val;
+    }else throw new Error('Нельзя присвоить значение этому выражению');
+  }
+}
+
+// ════════════ SYNTAX HIGHLIGHTING ════════════
+const KW_SET = new Set(KEYWORDS);
+const BUILTIN_SET2 = new Set(BUILTINS);
+
+function highlight(code) {
+  const lines = code.split('\n');
+  return lines.map(line => highlightLine(line)).join('\n');
+}
+
+function highlightLine(line) {
+  // comment
+  const ci = line.indexOf('//');
+  if (ci !== -1) {
+    const before = line.slice(0, ci);
+    const comment = line.slice(ci);
+    return highlightTokens(before) + `<span class="tok-cmt">${esc(comment)}</span>`;
+  }
+  return highlightTokens(line);
+}
+
+function highlightTokens(text) {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    if (/\s/.test(text[i])) { out += text[i++]; continue; }
+    // String
+    if (text[i] === '"' || text[i] === "'") {
+      const q = text[i]; let s = q; i++;
+      while (i < text.length && text[i] !== q) { s += text[i++]; }
+      s += text[i] || ''; i++;
+      out += `<span class="tok-str">${esc(s)}</span>`; continue;
+    }
+    // Number
+    if (/[0-9]/.test(text[i])) {
+      let n = '';
+      while (i < text.length && /[0-9.]/.test(text[i])) n += text[i++];
+      out += `<span class="tok-num">${esc(n)}</span>`; continue;
+    }
+    // Identifier
+    if (/[a-zA-Zа-яёА-ЯЁ_]/.test(text[i])) {
+      let id = '';
+      while (i < text.length && /[a-zA-Zа-яёА-ЯЁ_0-9]/.test(text[i])) id += text[i++];
+      if (KW_SET.has(id)) {
+        if (['истина','ложь','ничто'].includes(id)) out += `<span class="tok-bool">${esc(id)}</span>`;
+        else out += `<span class="tok-kw">${esc(id)}</span>`;
+      } else if (BUILTIN_SET2.has(id)) {
+        out += `<span class="tok-builtin">${esc(id)}</span>`;
+      } else {
+        // Check if next non-space is '('
+        let j = i;
+        while (j < text.length && text[j] === ' ') j++;
+        if (text[j] === '(') out += `<span class="tok-fn">${esc(id)}</span>`;
+        else out += `<span class="tok-plain">${esc(id)}</span>`;
+      }
+      continue;
+    }
+    // Operators
+    if ('+-*/%=<>!&|'.includes(text[i])) {
+      const two = text.slice(i, i+2);
+      if (['==','!=','<=','>=','++','--','+=','-=','*=','/='].includes(two)) {
+        out += `<span class="tok-op">${esc(two)}</span>`; i+=2;
+      } else {
+        out += `<span class="tok-op">${esc(text[i])}</span>`; i++;
+      }
+      continue;
+    }
+    out += esc(text[i++]);
+  }
+  return out;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ════════════ EDITOR SETUP ════════════
+const editor = document.getElementById('editor');
+const hlLayer = document.getElementById('highlight-layer');
+const lineNumbers = document.getElementById('line-numbers');
+const cursorLine = document.getElementById('cursor-line');
+const scroll = document.getElementById('editor-scroll');
+
+function updateHighlight() {
+  const code = editor.value;
+  hlLayer.innerHTML = highlight(code) + '\n';
+  updateLineNumbers(code);
+  syncScroll();
+  updateMinimap(code);
+}
+
+function updateLineNumbers(code) {
+  const lines = code.split('\n');
+  lineNumbers.innerHTML = lines.map((_,i)=>`<div>${i+1}</div>`).join('');
+}
+
+function syncScroll() {
+  hlLayer.style.transform = `translateY(-${scroll.scrollTop}px) translateX(-${scroll.scrollLeft}px)`;
+  lineNumbers.style.transform = `translateY(-${scroll.scrollTop}px)`;
+}
+
+function updateCursorLine() {
+  const val = editor.value;
+  const pos = editor.selectionStart;
+  const lineIdx = val.slice(0, pos).split('\n').length - 1;
+  cursorLine.style.top = (18 + lineIdx * 22) + 'px';
+}
+
+editor.addEventListener('input', () => { updateHighlight(); updateCursorLine(); });
+editor.addEventListener('keyup', updateCursorLine);
+editor.addEventListener('click', updateCursorLine);
+scroll.addEventListener('scroll', syncScroll);
+
+editor.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key === 'Enter') { e.preventDefault(); runCode(); return; }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s=editor.selectionStart, en=editor.selectionEnd;
+    editor.value=editor.value.slice(0,s)+'    '+editor.value.slice(en);
+    editor.selectionStart=editor.selectionEnd=s+4;
+    updateHighlight();
+  }
+  if (e.key === '(' || e.key === '[' || e.key === '{') {
+    const pairs = {'(':')', '[':']', '{':'}'};
+    const close = pairs[e.key];
+    e.preventDefault();
+    const s=editor.selectionStart, en=editor.selectionEnd;
+    editor.value=editor.value.slice(0,s)+e.key+close+editor.value.slice(en);
+    editor.selectionStart=editor.selectionEnd=s+1;
+    updateHighlight();
+  }
+  if (e.key === '"') {
+    e.preventDefault();
+    const s=editor.selectionStart, en=editor.selectionEnd;
+    editor.value=editor.value.slice(0,s)+'""'+editor.value.slice(en);
+    editor.selectionStart=editor.selectionEnd=s+1;
+    updateHighlight();
+  }
+});
+
+// Minimap
+const minimapCanvas = document.getElementById('minimap-canvas');
+const mctx = minimapCanvas.getContext('2d');
+
+function updateMinimap(code) {
+  const h = scroll.clientHeight || 400;
+  minimapCanvas.height = h;
+  mctx.clearRect(0, 0, 60, h);
+  const lines = code.split('\n');
+  const scale = h / Math.max(lines.length * 3, h);
+  lines.forEach((line, i) => {
+    const y = i * 3 * scale;
+    if (line.includes('//')) mctx.fillStyle = 'rgba(232,232,245,0.08)';
+    else if (/перем|функция|если|пока|от|каждый/.test(line)) mctx.fillStyle = 'rgba(255,61,90,0.3)';
+    else if (/вывести/.test(line)) mctx.fillStyle = 'rgba(0,229,160,0.25)';
+    else mctx.fillStyle = 'rgba(232,232,245,0.1)';
+    const w = Math.min(line.length * 0.4, 50);
+    mctx.fillRect(4, y, w, 2);
+  });
+}
+
+// ════════════ VARIABLE INSPECTOR ════════════
+function updateInspector(vars) {
+  const view = document.getElementById('ast-view');
+  document.getElementById('var-count').textContent = vars.size;
+  if (vars.size === 0) {
+    view.innerHTML = '<div style="color:var(--muted);padding:8px;font-size:11px;font-family:var(--fg)">Нет переменных</div>';
+    return;
+  }
+  let html = '';
+  for (const [k, v] of vars) {
+    const isArr = Array.isArray(v);
+    const isFn = typeof v === 'function';
+    const typeColor = isArr ? 'var(--y)' : isFn ? 'var(--b)' : typeof v === 'string' ? 'var(--g)' : typeof v === 'number' ? 'var(--y)' : 'var(--p)';
+    const typeLabel = isArr ? 'массив['+v.length+']' : isFn ? 'функция' : typeof v === 'string' ? 'строка' : typeof v === 'number' ? 'число' : typeof v === 'boolean' ? 'булево' : 'ничто';
+    let valStr = '';
+    if (isArr) valStr = '[' + v.map(x=>JSON.stringify(x)).join(', ') + ']';
+    else if (isFn) valStr = 'ƒ ' + (v._name || '?') + '()';
+    else valStr = JSON.stringify(v);
+    html += `<div class="ast-node" style="margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="color:var(--text);font-size:12px">${esc(k)}</span>
+        <span style="font-size:9px;color:${typeColor};font-family:var(--fg)">${typeLabel}</span>
+      </div>
+      <div style="color:var(--muted);font-size:11px;word-break:break-all;margin-top:2px">${esc(String(valStr).slice(0,80))}${String(valStr).length>80?'…':''}</div>
+    </div>`;
+  }
+  view.innerHTML = html;
+}
+
+// ════════════ RUN ENGINE ════════════
+let outLineNum = 1;
+
+function addOut(text, cls='ok') {
+  const out = document.getElementById('output');
+  const d = document.createElement('div');
+  d.className = 'out-line';
+  d.innerHTML = `<div class="out-n">${outLineNum++}</div><div class="out-v ${cls}">${esc(String(text))}</div>`;
+  out.appendChild(d);
+  out.scrollTop = out.scrollHeight;
+}
+
+function setStatus(txt, type) {
+  document.getElementById('status-txt').textContent = txt;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot ' + (type||'');
+}
+
+function clearOutput() {
+  document.getElementById('output').innerHTML = '<div class="out-line"><div class="out-n">—</div><div class="out-v info">// Очищено</div></div>';
+  outLineNum = 1;
+  setStatus('Очищено');
+}
+
+function runCode() {
+  const code = editor.value.trim();
+  if (!code) return;
+  document.getElementById('output').innerHTML = '';
+  outLineNum = 1;
+  setStatus('Выполняется…', 'run');
+
+  const btn = document.getElementById('run-btn');
+  btn.textContent = '⏳ Работаю…';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    try {
+      const tokens = tokenize(code);
+      const ast = new Parser(tokens).prog();
+      const interp = new Interpreter(text => addOut(text, 'ok'));
+      interp.run(ast);
+      setStatus('Успешно ✓', 'ok');
+      updateInspector(interp.vars);
+    } catch(e) {
+      addOut('⛔ ' + e.message, 'err');
+      setStatus('Ошибка', 'err');
+    }
+    btn.textContent = '▶ Запустить';
+    btn.disabled = false;
+  }, 10);
+}
+
+// ════════════ EXAMPLES ════════════
+function loadEx(name) {
+  editor.value = EXAMPLES[name];
+  updateHighlight();
+  updateCursorLine();
+  clearOutput();
+}
+
+// ════════════ SIDEBAR TOGGLE ════════════
+function toggleSection(head) {
+  const arrow = head.querySelector('.s-arrow');
+  const body = head.nextElementSibling;
+  if (arrow.classList.contains('open')) {
+    arrow.classList.remove('open');
+    body.style.display = 'none';
+  } else {
+    arrow.classList.add('open');
+    body.style.display = '';
+  }
+}
+
+// ════════════ AUTOCOMPLETE ════════════
+const AC_WORDS = [
+  ...KEYWORDS.map(k=>({label:k,kind:'kw'})),
+  ...BUILTINS.map(b=>({label:b,kind:'builtin'})),
+];
+
+let acActive = false;
+let acIdx = 0;
+let acItems = [];
+
+editor.addEventListener('input', showAC);
+editor.addEventListener('keydown', handleACKeys);
+
+function showAC() {
+  const pos = editor.selectionStart;
+  const before = editor.value.slice(0, pos);
+  const match = before.match(/[а-яёА-ЯЁa-zA-Z_]+$/);
+  const ac = document.getElementById('autocomplete');
+  if (!match || match[0].length < 2) { ac.style.display='none'; acActive=false; return; }
+  const q = match[0].toLowerCase();
+  acItems = AC_WORDS.filter(w => w.label.startsWith(q) && w.label !== q).slice(0,8);
+  if (!acItems.length) { ac.style.display='none'; acActive=false; return; }
+  acIdx = 0;
+  renderAC();
+  positionAC();
+  acActive = true;
+}
+
+function renderAC() {
+  const ac = document.getElementById('autocomplete');
+  ac.innerHTML = acItems.map((item,i) =>
+    `<div class="ac-item${i===acIdx?' selected':''}" onclick="applyAC(${i})">
+      <span class="ac-kind">${item.kind}</span>
+      <span class="ac-kw ${item.kind}">${item.label}</span>
+    </div>`
+  ).join('');
+  ac.style.display = 'block';
+}
+
+function positionAC() {
+  const ac = document.getElementById('autocomplete');
+  // Simple positioning near editor
+  const rect = editor.getBoundingClientRect();
+  const pos = editor.selectionStart;
+  const before = editor.value.slice(0, pos);
+  const lineIdx = before.split('\n').length - 1;
+  const colIdx = before.split('\n').pop().length;
+  ac.style.top = (rect.top + 18 + lineIdx * 22 - scroll.scrollTop + 22) + 'px';
+  ac.style.left = (rect.left + 48 + colIdx * 8) + 'px';
+}
+
+function handleACKeys(e) {
+  if (!acActive) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); acIdx=(acIdx+1)%acItems.length; renderAC(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acIdx=(acIdx-1+acItems.length)%acItems.length; renderAC(); }
+  else if (e.key === 'Tab' || e.key === 'Enter') {
+    if (acActive && acItems.length) { e.preventDefault(); applyAC(acIdx); }
+  } else if (e.key === 'Escape') { document.getElementById('autocomplete').style.display='none'; acActive=false; }
+}
+
+function applyAC(i) {
+  const item = acItems[i];
+  const pos = editor.selectionStart;
+  const before = editor.value.slice(0, pos);
+  const match = before.match(/[а-яёА-ЯЁa-zA-Z_]+$/);
+  if (!match) return;
+  const start = pos - match[0].length;
+  editor.value = editor.value.slice(0, start) + item.label + editor.value.slice(pos);
+  editor.selectionStart = editor.selectionEnd = start + item.label.length;
+  document.getElementById('autocomplete').style.display = 'none';
+  acActive = false;
+  updateHighlight();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#autocomplete')) { document.getElementById('autocomplete').style.display='none'; acActive=false; }
+});
+
+// ════════════ RESIZE OUTPUT ════════════
+const resizeHandle = document.getElementById('resize-handle');
+let resizing = false, startY = 0, startH = 0;
+resizeHandle.addEventListener('mousedown', e => {
+  resizing = true; startY = e.clientY;
+  startH = document.getElementById('output-panel').offsetHeight;
+  document.body.style.cursor = 'row-resize';
+});
+document.addEventListener('mousemove', e => {
+  if (!resizing) return;
+  const delta = startY - e.clientY;
+  const newH = Math.max(80, Math.min(startH + delta, 600));
+  document.getElementById('output-panel').style.height = newH + 'px';
+});
+document.addEventListener('mouseup', () => { resizing = false; document.body.style.cursor = ''; });
+
+// ════════════ INIT ════════════
+loadEx('hello');
+setTimeout(() => { editor.focus(); }, 2000);
+</script>
+</body>
+</html>
